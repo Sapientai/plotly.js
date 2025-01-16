@@ -1,6 +1,6 @@
 /**
 * plotly.js (cartesian) v3.0.0-rc.2
-* Copyright 2012-2024, Plotly, Inc.
+* Copyright 2012-2025, Plotly, Inc.
 * All rights reserved.
 * Licensed under the MIT license
 */
@@ -13734,10 +13734,10 @@ var Plotly = (() => {
     }
   });
 
-  // stylePlugin:/home/solarch/plotly/webgl/plotly.js/node_modules/maplibre-gl/dist/maplibre-gl.css
+  // stylePlugin:/Users/matthewwaller/Developer/Sapientai/Labeler/submodules/plotly.js/node_modules/maplibre-gl/dist/maplibre-gl.css
   var maplibre_gl_exports = {};
   var init_maplibre_gl2 = __esm({
-    "stylePlugin:/home/solarch/plotly/webgl/plotly.js/node_modules/maplibre-gl/dist/maplibre-gl.css"() {
+    "stylePlugin:/Users/matthewwaller/Developer/Sapientai/Labeler/submodules/plotly.js/node_modules/maplibre-gl/dist/maplibre-gl.css"() {
       init_maplibre_gl();
     }
   });
@@ -35813,9 +35813,6 @@ var Plotly = (() => {
           }
         }
       }
-      function shouldSkipEdits(gd) {
-        return !!gd._fullLayout._outlining;
-      }
       function couldHaveActiveShape(gd) {
         return !gd._context.edits.shapePosition;
       }
@@ -35844,8 +35841,10 @@ var Plotly = (() => {
           var attrs = {
             "data-index": index,
             "fill-rule": options.fillrule,
-            d
+            d,
+            "class": "shape-path"
           };
+          console.log("Drawing shape:", index);
           var opacity = options.opacity;
           var fillColor = options.fillcolor;
           var lineColor = options.line.width ? options.line.color : "rgba(0,0,0,0)";
@@ -35863,38 +35862,61 @@ var Plotly = (() => {
           }
           var shapeGroup = shapeLayer.append("g").classed("shape-group", true).attr({ "data-index": index });
           var path = shapeGroup.append("path").attr(attrs).style("opacity", opacity).call(Color.stroke, lineColor).call(Color.fill, fillColor).call(Drawing.dashLine, lineDash, lineWidth);
+          path.style({
+            "cursor": "pointer",
+            "pointer-events": "all",
+            "z-index": "-1"
+          });
+          path.node().addEventListener("click", function(evt) {
+            if (gd._hoverdata) {
+              return;
+            }
+            console.log("Shape clicked:", index);
+            evt.stopPropagation();
+            evt.preventDefault();
+            var eventData = {
+              points: [{
+                curveNumber: -1,
+                // Special number for shapes
+                pointNumber: index,
+                pointIndex: index,
+                data: {
+                  shapeId: options.id || `shape-${index}`,
+                  type: "shape"
+                },
+                x: options.x0,
+                y: options.y0,
+                customdata: {
+                  type: "shape",
+                  index,
+                  shapeId: options.id || `shape-${index}`,
+                  x0: options.x0,
+                  y0: options.y0,
+                  x1: options.x1,
+                  y1: options.y1,
+                  fillcolor: options.fillcolor
+                }
+              }]
+            };
+            console.log("Emitting click event with data:", JSON.stringify(eventData, null, 2));
+            if (gd && typeof gd.emit === "function") {
+              gd._hoverdata = null;
+              if (gd._fullLayout) {
+                gd._fullLayout._hoversubplot = null;
+              }
+              gd.emit("plotly_click", eventData);
+            }
+            return false;
+          });
           setClipPath(shapeGroup, gd, options);
           drawLabel(gd, index, options, shapeGroup);
-          var editHelpers;
-          if (isActiveShape || gd._context.edits.shapePosition) editHelpers = arrayEditor(gd.layout, "shapes", options);
-          if (isActiveShape) {
-            path.style({
-              cursor: "move"
-            });
-            var dragOptions = {
-              element: path.node(),
-              plotinfo,
-              gd,
-              editHelpers,
-              hasText: options.label.text || options.label.texttemplate,
-              isActiveShape: true
-              // i.e. to enable controllers
-            };
-            var polygons = readPaths(d, gd);
-            displayOutlines(polygons, path, dragOptions);
-          } else {
-            if (gd._context.edits.shapePosition) {
-              setupDragElement(gd, path, options, index, shapeLayer, editHelpers);
-            } else if (options.editable === true) {
-              path.style(
-                "pointer-events",
-                isOpen || Color.opacity(fillColor) * opacity <= 0.5 ? "stroke" : "all"
-              );
-            }
-          }
-          path.node().addEventListener("click", function() {
-            return activateShape(gd, path);
+          gd.on("plotly_unhover", function() {
+            path.style("pointer-events", "all");
           });
+          gd.on("plotly_hover", function() {
+            path.style("pointer-events", "none");
+          });
+          return path;
         }
       }
       function setClipPath(shapePath, gd, shapeOptions) {
@@ -35904,359 +35926,6 @@ var Plotly = (() => {
           clipAxes ? "clip" + gd._fullLayout._uid + clipAxes : null,
           gd
         );
-      }
-      function setupDragElement(gd, shapePath, shapeOptions, index, shapeLayer, editHelpers) {
-        var MINWIDTH = 10;
-        var MINHEIGHT = 10;
-        var xPixelSized = shapeOptions.xsizemode === "pixel";
-        var yPixelSized = shapeOptions.ysizemode === "pixel";
-        var isLine = shapeOptions.type === "line";
-        var isPath = shapeOptions.type === "path";
-        var modifyItem = editHelpers.modifyItem;
-        var x0, y0, x1, y1, xAnchor, yAnchor;
-        var n0, s0, w0, e0, optN, optS, optW, optE;
-        var pathIn;
-        var shapeGroup = d3.select(shapePath.node().parentNode);
-        var xa = Axes.getFromId(gd, shapeOptions.xref);
-        var xRefType = Axes.getRefType(shapeOptions.xref);
-        var ya = Axes.getFromId(gd, shapeOptions.yref);
-        var yRefType = Axes.getRefType(shapeOptions.yref);
-        var shiftXStart = shapeOptions.x0shift;
-        var shiftXEnd = shapeOptions.x1shift;
-        var shiftYStart = shapeOptions.y0shift;
-        var shiftYEnd = shapeOptions.y1shift;
-        var x2p = function(v, shift) {
-          var dataToPixel = helpers.getDataToPixel(gd, xa, shift, false, xRefType);
-          return dataToPixel(v);
-        };
-        var y2p = function(v, shift) {
-          var dataToPixel = helpers.getDataToPixel(gd, ya, shift, true, yRefType);
-          return dataToPixel(v);
-        };
-        var p2x = helpers.getPixelToData(gd, xa, false, xRefType);
-        var p2y = helpers.getPixelToData(gd, ya, true, yRefType);
-        var sensoryElement = obtainSensoryElement();
-        var dragOptions = {
-          element: sensoryElement.node(),
-          gd,
-          prepFn: startDrag,
-          doneFn: endDrag,
-          clickFn: abortDrag
-        };
-        var dragMode;
-        dragElement.init(dragOptions);
-        sensoryElement.node().onmousemove = updateDragMode;
-        function obtainSensoryElement() {
-          return isLine ? createLineDragHandles() : shapePath;
-        }
-        function createLineDragHandles() {
-          var minSensoryWidth = 10;
-          var sensoryWidth = Math.max(shapeOptions.line.width, minSensoryWidth);
-          var g = shapeLayer.append("g").attr("data-index", index).attr("drag-helper", true);
-          g.append("path").attr("d", shapePath.attr("d")).style({
-            cursor: "move",
-            "stroke-width": sensoryWidth,
-            "stroke-opacity": "0"
-            // ensure not visible
-          });
-          var circleStyle = {
-            "fill-opacity": "0"
-            // ensure not visible
-          };
-          var circleRadius = Math.max(sensoryWidth / 2, minSensoryWidth);
-          g.append("circle").attr({
-            "data-line-point": "start-point",
-            cx: xPixelSized ? x2p(shapeOptions.xanchor) + shapeOptions.x0 : x2p(shapeOptions.x0, shiftXStart),
-            cy: yPixelSized ? y2p(shapeOptions.yanchor) - shapeOptions.y0 : y2p(shapeOptions.y0, shiftYStart),
-            r: circleRadius
-          }).style(circleStyle).classed("cursor-grab", true);
-          g.append("circle").attr({
-            "data-line-point": "end-point",
-            cx: xPixelSized ? x2p(shapeOptions.xanchor) + shapeOptions.x1 : x2p(shapeOptions.x1, shiftXEnd),
-            cy: yPixelSized ? y2p(shapeOptions.yanchor) - shapeOptions.y1 : y2p(shapeOptions.y1, shiftYEnd),
-            r: circleRadius
-          }).style(circleStyle).classed("cursor-grab", true);
-          return g;
-        }
-        function updateDragMode(evt) {
-          if (shouldSkipEdits(gd)) {
-            dragMode = null;
-            return;
-          }
-          if (isLine) {
-            if (evt.target.tagName === "path") {
-              dragMode = "move";
-            } else {
-              dragMode = evt.target.attributes["data-line-point"].value === "start-point" ? "resize-over-start-point" : "resize-over-end-point";
-            }
-          } else {
-            var dragBBox = dragOptions.element.getBoundingClientRect();
-            var w = dragBBox.right - dragBBox.left;
-            var h = dragBBox.bottom - dragBBox.top;
-            var x = evt.clientX - dragBBox.left;
-            var y = evt.clientY - dragBBox.top;
-            var cursor = !isPath && w > MINWIDTH && h > MINHEIGHT && !evt.shiftKey ? dragElement.getCursor(x / w, 1 - y / h) : "move";
-            setCursor(shapePath, cursor);
-            dragMode = cursor.split("-")[0];
-          }
-        }
-        function startDrag(evt) {
-          if (shouldSkipEdits(gd)) return;
-          if (xPixelSized) {
-            xAnchor = x2p(shapeOptions.xanchor);
-          }
-          if (yPixelSized) {
-            yAnchor = y2p(shapeOptions.yanchor);
-          }
-          if (shapeOptions.type === "path") {
-            pathIn = shapeOptions.path;
-          } else {
-            x0 = xPixelSized ? shapeOptions.x0 : x2p(shapeOptions.x0);
-            y0 = yPixelSized ? shapeOptions.y0 : y2p(shapeOptions.y0);
-            x1 = xPixelSized ? shapeOptions.x1 : x2p(shapeOptions.x1);
-            y1 = yPixelSized ? shapeOptions.y1 : y2p(shapeOptions.y1);
-          }
-          if (x0 < x1) {
-            w0 = x0;
-            optW = "x0";
-            e0 = x1;
-            optE = "x1";
-          } else {
-            w0 = x1;
-            optW = "x1";
-            e0 = x0;
-            optE = "x0";
-          }
-          if (!yPixelSized && y0 < y1 || yPixelSized && y0 > y1) {
-            n0 = y0;
-            optN = "y0";
-            s0 = y1;
-            optS = "y1";
-          } else {
-            n0 = y1;
-            optN = "y1";
-            s0 = y0;
-            optS = "y0";
-          }
-          updateDragMode(evt);
-          renderVisualCues(shapeLayer, shapeOptions);
-          deactivateClipPathTemporarily(shapePath, shapeOptions, gd);
-          dragOptions.moveFn = dragMode === "move" ? moveShape : resizeShape;
-          dragOptions.altKey = evt.altKey;
-        }
-        function endDrag() {
-          if (shouldSkipEdits(gd)) return;
-          setCursor(shapePath);
-          removeVisualCues(shapeLayer);
-          setClipPath(shapePath, gd, shapeOptions);
-          Registry.call("_guiRelayout", gd, editHelpers.getUpdateObj());
-        }
-        function abortDrag() {
-          if (shouldSkipEdits(gd)) return;
-          removeVisualCues(shapeLayer);
-        }
-        function moveShape(dx, dy) {
-          if (shapeOptions.type === "path") {
-            var noOp = function(coord) {
-              return coord;
-            };
-            var moveX = noOp;
-            var moveY = noOp;
-            if (xPixelSized) {
-              modifyItem("xanchor", shapeOptions.xanchor = p2x(xAnchor + dx));
-            } else {
-              moveX = function moveX2(x) {
-                return p2x(x2p(x) + dx);
-              };
-              if (xa && xa.type === "date") moveX = helpers.encodeDate(moveX);
-            }
-            if (yPixelSized) {
-              modifyItem("yanchor", shapeOptions.yanchor = p2y(yAnchor + dy));
-            } else {
-              moveY = function moveY2(y) {
-                return p2y(y2p(y) + dy);
-              };
-              if (ya && ya.type === "date") moveY = helpers.encodeDate(moveY);
-            }
-            modifyItem("path", shapeOptions.path = movePath(pathIn, moveX, moveY));
-          } else {
-            if (xPixelSized) {
-              modifyItem("xanchor", shapeOptions.xanchor = p2x(xAnchor + dx));
-            } else {
-              modifyItem("x0", shapeOptions.x0 = p2x(x0 + dx));
-              modifyItem("x1", shapeOptions.x1 = p2x(x1 + dx));
-            }
-            if (yPixelSized) {
-              modifyItem("yanchor", shapeOptions.yanchor = p2y(yAnchor + dy));
-            } else {
-              modifyItem("y0", shapeOptions.y0 = p2y(y0 + dy));
-              modifyItem("y1", shapeOptions.y1 = p2y(y1 + dy));
-            }
-          }
-          shapePath.attr("d", getPathString(gd, shapeOptions));
-          renderVisualCues(shapeLayer, shapeOptions);
-          drawLabel(gd, index, shapeOptions, shapeGroup);
-        }
-        function resizeShape(dx, dy) {
-          if (isPath) {
-            var noOp = function(coord) {
-              return coord;
-            };
-            var moveX = noOp;
-            var moveY = noOp;
-            if (xPixelSized) {
-              modifyItem("xanchor", shapeOptions.xanchor = p2x(xAnchor + dx));
-            } else {
-              moveX = function moveX2(x) {
-                return p2x(x2p(x) + dx);
-              };
-              if (xa && xa.type === "date") moveX = helpers.encodeDate(moveX);
-            }
-            if (yPixelSized) {
-              modifyItem("yanchor", shapeOptions.yanchor = p2y(yAnchor + dy));
-            } else {
-              moveY = function moveY2(y) {
-                return p2y(y2p(y) + dy);
-              };
-              if (ya && ya.type === "date") moveY = helpers.encodeDate(moveY);
-            }
-            modifyItem("path", shapeOptions.path = movePath(pathIn, moveX, moveY));
-          } else if (isLine) {
-            if (dragMode === "resize-over-start-point") {
-              var newX0 = x0 + dx;
-              var newY0 = yPixelSized ? y0 - dy : y0 + dy;
-              modifyItem("x0", shapeOptions.x0 = xPixelSized ? newX0 : p2x(newX0));
-              modifyItem("y0", shapeOptions.y0 = yPixelSized ? newY0 : p2y(newY0));
-            } else if (dragMode === "resize-over-end-point") {
-              var newX1 = x1 + dx;
-              var newY1 = yPixelSized ? y1 - dy : y1 + dy;
-              modifyItem("x1", shapeOptions.x1 = xPixelSized ? newX1 : p2x(newX1));
-              modifyItem("y1", shapeOptions.y1 = yPixelSized ? newY1 : p2y(newY1));
-            }
-          } else {
-            var has = function(str) {
-              return dragMode.indexOf(str) !== -1;
-            };
-            var hasN = has("n");
-            var hasS = has("s");
-            var hasW = has("w");
-            var hasE = has("e");
-            var newN = hasN ? n0 + dy : n0;
-            var newS = hasS ? s0 + dy : s0;
-            var newW = hasW ? w0 + dx : w0;
-            var newE = hasE ? e0 + dx : e0;
-            if (yPixelSized) {
-              if (hasN) newN = n0 - dy;
-              if (hasS) newS = s0 - dy;
-            }
-            if (!yPixelSized && newS - newN > MINHEIGHT || yPixelSized && newN - newS > MINHEIGHT) {
-              modifyItem(optN, shapeOptions[optN] = yPixelSized ? newN : p2y(newN));
-              modifyItem(optS, shapeOptions[optS] = yPixelSized ? newS : p2y(newS));
-            }
-            if (newE - newW > MINWIDTH) {
-              modifyItem(optW, shapeOptions[optW] = xPixelSized ? newW : p2x(newW));
-              modifyItem(optE, shapeOptions[optE] = xPixelSized ? newE : p2x(newE));
-            }
-          }
-          shapePath.attr("d", getPathString(gd, shapeOptions));
-          renderVisualCues(shapeLayer, shapeOptions);
-          drawLabel(gd, index, shapeOptions, shapeGroup);
-        }
-        function renderVisualCues(shapeLayer2, shapeOptions2) {
-          if (xPixelSized || yPixelSized) {
-            renderAnchor();
-          }
-          function renderAnchor() {
-            var isNotPath = shapeOptions2.type !== "path";
-            var visualCues = shapeLayer2.selectAll(".visual-cue").data([0]);
-            var strokeWidth = 1;
-            visualCues.enter().append("path").attr({
-              fill: "#fff",
-              "fill-rule": "evenodd",
-              stroke: "#000",
-              "stroke-width": strokeWidth
-            }).classed("visual-cue", true);
-            var posX = x2p(
-              xPixelSized ? shapeOptions2.xanchor : Lib.midRange(
-                isNotPath ? [shapeOptions2.x0, shapeOptions2.x1] : helpers.extractPathCoords(shapeOptions2.path, constants.paramIsX)
-              )
-            );
-            var posY = y2p(
-              yPixelSized ? shapeOptions2.yanchor : Lib.midRange(
-                isNotPath ? [shapeOptions2.y0, shapeOptions2.y1] : helpers.extractPathCoords(shapeOptions2.path, constants.paramIsY)
-              )
-            );
-            posX = helpers.roundPositionForSharpStrokeRendering(posX, strokeWidth);
-            posY = helpers.roundPositionForSharpStrokeRendering(posY, strokeWidth);
-            if (xPixelSized && yPixelSized) {
-              var crossPath = "M" + (posX - 1 - strokeWidth) + "," + (posY - 1 - strokeWidth) + "h-8v2h8 v8h2v-8 h8v-2h-8 v-8h-2 Z";
-              visualCues.attr("d", crossPath);
-            } else if (xPixelSized) {
-              var vBarPath = "M" + (posX - 1 - strokeWidth) + "," + (posY - 9 - strokeWidth) + "v18 h2 v-18 Z";
-              visualCues.attr("d", vBarPath);
-            } else {
-              var hBarPath = "M" + (posX - 9 - strokeWidth) + "," + (posY - 1 - strokeWidth) + "h18 v2 h-18 Z";
-              visualCues.attr("d", hBarPath);
-            }
-          }
-        }
-        function removeVisualCues(shapeLayer2) {
-          shapeLayer2.selectAll(".visual-cue").remove();
-        }
-        function deactivateClipPathTemporarily(shapePath2, shapeOptions2, gd2) {
-          var xref = shapeOptions2.xref;
-          var yref = shapeOptions2.yref;
-          var xa2 = Axes.getFromId(gd2, xref);
-          var ya2 = Axes.getFromId(gd2, yref);
-          var clipAxes = "";
-          if (xref !== "paper" && !xa2.autorange) clipAxes += xref;
-          if (yref !== "paper" && !ya2.autorange) clipAxes += yref;
-          Drawing.setClipUrl(
-            shapePath2,
-            clipAxes ? "clip" + gd2._fullLayout._uid + clipAxes : null,
-            gd2
-          );
-        }
-      }
-      function movePath(pathIn, moveX, moveY) {
-        return pathIn.replace(constants.segmentRE, function(segment) {
-          var paramNumber = 0;
-          var segmentType = segment.charAt(0);
-          var xParams = constants.paramIsX[segmentType];
-          var yParams = constants.paramIsY[segmentType];
-          var nParams = constants.numParams[segmentType];
-          var paramString = segment.substr(1).replace(constants.paramRE, function(param) {
-            if (paramNumber >= nParams) return param;
-            if (xParams[paramNumber]) param = moveX(param);
-            else if (yParams[paramNumber]) param = moveY(param);
-            paramNumber++;
-            return param;
-          });
-          return segmentType + paramString;
-        });
-      }
-      function activateShape(gd, path) {
-        if (!couldHaveActiveShape(gd)) return;
-        var element = path.node();
-        var id = +element.getAttribute("data-index");
-        if (id >= 0) {
-          if (id === gd._fullLayout._activeShapeIndex) {
-            deactivateShape(gd);
-            return;
-          }
-          gd._fullLayout._activeShapeIndex = id;
-          gd._fullLayout._deactivateShape = deactivateShape;
-          draw(gd);
-        }
-      }
-      function deactivateShape(gd) {
-        if (!couldHaveActiveShape(gd)) return;
-        var id = gd._fullLayout._activeShapeIndex;
-        if (id >= 0) {
-          clearOutlineControllers(gd);
-          delete gd._fullLayout._activeShapeIndex;
-          draw(gd);
-        }
       }
       function eraseActiveShape(gd) {
         if (!couldHaveActiveShape(gd)) return;

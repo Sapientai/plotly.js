@@ -65,6 +65,7 @@ function draw(gd) {
 
     // may need to resurrect this if we put text (LaTeX) in shapes
     // return Plots.previousPromises(gd);
+
 }
 
 function shouldSkipEdits(gd) {
@@ -114,8 +115,11 @@ function drawOne(gd, index) {
         var attrs = {
             'data-index': index,
             'fill-rule': options.fillrule,
-            d: d
+            d: d,
+            'class': 'shape-path'
         };
+
+        console.log('Drawing shape:', index);
 
         var opacity = options.opacity;
         var fillColor = options.fillcolor;
@@ -151,41 +155,78 @@ function drawOne(gd, index) {
             .call(Color.fill, fillColor)
             .call(Drawing.dashLine, lineDash, lineWidth);
 
-        setClipPath(shapeGroup, gd, options);
+        path.style({
+            'cursor': 'pointer',
+            'pointer-events': 'all',
+            'z-index': '-1'
+        });
 
-        // Draw or clear the label
+        // Updated click handler with Dash-compatible structure
+        path.node().addEventListener('click', function(evt) {
+            // First check if we're hovering over a data point
+            if (gd._hoverdata) {
+                // If there's hover data, let the normal point click handling take over
+                return;
+            }
+
+            console.log('Shape clicked:', index);
+            evt.stopPropagation();
+            evt.preventDefault();
+            
+            // Structure matching Dash's expected format
+            var eventData = {
+                points: [{
+                    curveNumber: -1,  // Special number for shapes
+                    pointNumber: index,
+                    pointIndex: index,
+                    data: {
+                        shapeId: options.id || `shape-${index}`,
+                        type: 'shape'
+                    },
+                    x: options.x0,
+                    y: options.y0,
+                    customdata: {
+                        type: 'shape',
+                        index: index,
+                        shapeId: options.id || `shape-${index}`,
+                        x0: options.x0,
+                        y0: options.y0,
+                        x1: options.x1,
+                        y1: options.y1,
+                        fillcolor: options.fillcolor
+                    }
+                }]
+            };
+            
+            console.log('Emitting click event with data:', JSON.stringify(eventData, null, 2));
+            
+            if (gd && typeof gd.emit === 'function') {
+                // Clear any existing hover states
+                gd._hoverdata = null;
+                if (gd._fullLayout) {
+                    gd._fullLayout._hoversubplot = null;
+                }
+                
+                // Emit the click event
+                gd.emit('plotly_click', eventData);
+            }
+            
+            return false;
+        });
+
+        setClipPath(shapeGroup, gd, options);
         drawLabel(gd, index, options, shapeGroup);
 
-        var editHelpers;
-        if(isActiveShape || gd._context.edits.shapePosition) editHelpers = arrayEditor(gd.layout, 'shapes', options);
+        // Add pointer-events back only when not hovering over data
+        gd.on('plotly_unhover', function() {
+            path.style('pointer-events', 'all');
+        });
 
-        if(isActiveShape) {
-            path.style({
-                cursor: 'move',
-            });
+        gd.on('plotly_hover', function() {
+            path.style('pointer-events', 'none');
+        });
 
-            var dragOptions = {
-                element: path.node(),
-                plotinfo: plotinfo,
-                gd: gd,
-                editHelpers: editHelpers,
-                hasText: options.label.text || options.label.texttemplate,
-                isActiveShape: true // i.e. to enable controllers
-            };
-
-            var polygons = readPaths(d, gd);
-            // display polygons on the screen
-            displayOutlines(polygons, path, dragOptions);
-        } else {
-            if(gd._context.edits.shapePosition) {
-                setupDragElement(gd, path, options, index, shapeLayer, editHelpers);
-            } else if(options.editable === true) {
-                path.style('pointer-events',
-                    (isOpen || Color.opacity(fillColor) * opacity <= 0.5) ? 'stroke' : 'all'
-                );
-            }
-        }
-        path.node().addEventListener('click', function() { return activateShape(gd, path); });
+        return path;
     }
 }
 
@@ -361,7 +402,7 @@ function setupDragElement(gd, shapePath, shapeOptions, index, shapeLayer, editHe
             x0 = xPixelSized ? shapeOptions.x0 : x2p(shapeOptions.x0);
             y0 = yPixelSized ? shapeOptions.y0 : y2p(shapeOptions.y0);
             x1 = xPixelSized ? shapeOptions.x1 : x2p(shapeOptions.x1);
-            y1 = yPixelSized ? shapeOptions.y1 : y2p(shapeOptions.y1);
+            y1 = xPixelSized ? shapeOptions.y1 : y2p(shapeOptions.y1);
         }
 
         if(x0 < x1) {
