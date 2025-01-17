@@ -120,39 +120,37 @@ module.exports = function displayOutlines(polygons, outlines, dragOptions, nCall
 
         var cell = polygons[indexI];
         var len = cell.length;
+
         if(pointsOnRectangle(cell)) {
             var _dx = dx;
-            var _dy = dy;
+            var _dy = 0; // Force dy to 0 to restrict to horizontal movement
+
             if(dragOptions.isActiveSelection) {
-                // handle an edge contoller for rect selections
                 var nextPoint = getNextPoint(cell, indexJ);
                 if(nextPoint[1] === cell[indexJ][1]) { // a vertical edge
                     _dy = 0;
                 } else { // a horizontal edge
-                    _dx = 0;
+                    _dx = dx;
+                    _dy = 0;
                 }
             }
 
             for(var q = 0; q < len; q++) {
                 if(q === indexJ) continue;
 
-                // move other corners of rectangle
                 var pos = cell[q];
-
                 if(pos[1] === cell[indexJ][1]) {
                     pos[1] = x0 + _dx;
                 }
-
                 if(pos[2] === cell[indexJ][2]) {
-                    pos[2] = y0 + _dy;
+                    pos[2] = y0; // Keep original y position
                 }
             }
-            // move the corner
+            
             cell[indexJ][1] = x0 + _dx;
-            cell[indexJ][2] = y0 + _dy;
+            cell[indexJ][2] = y0; // Keep original y position
 
             if(!pointsOnRectangle(cell)) {
-                // reject result to rectangles with ensure areas
                 for(var j = 0; j < len; j++) {
                     for(var k = 0; k < cell[j].length; k++) {
                         cell[j][k] = copyPolygons[indexI][j][k];
@@ -161,7 +159,7 @@ module.exports = function displayOutlines(polygons, outlines, dragOptions, nCall
             }
         } else { // other polylines
             cell[indexJ][1] = x0 + dx;
-            cell[indexJ][2] = y0 + dy;
+            cell[indexJ][2] = y0; // Keep original y position
         }
 
         redraw();
@@ -291,11 +289,13 @@ module.exports = function displayOutlines(polygons, outlines, dragOptions, nCall
     function moveGroup(dx, dy) {
         if(!polygons.length) return;
 
+        dy = 0; // Force dy to 0 to restrict to horizontal movement only
+
         for(var i = 0; i < polygons.length; i++) {
             for(var j = 0; j < polygons[i].length; j++) {
                 for(var k = 0; k + 2 < polygons[i][j].length; k += 2) {
                     polygons[i][j][k + 1] = copyPolygons[i][j][k + 1] + dx;
-                    polygons[i][j][k + 2] = copyPolygons[i][j][k + 2] + dy;
+                    polygons[i][j][k + 2] = copyPolygons[i][j][k + 2]; // Keep original y position
                 }
             }
         }
@@ -303,7 +303,6 @@ module.exports = function displayOutlines(polygons, outlines, dragOptions, nCall
 
     function moveGroupController(dx, dy) {
         moveGroup(dx, dy);
-
         redraw();
     }
 
