@@ -155,6 +155,8 @@ function drawOne(gd, index) {
             .call(Color.fill, fillColor)
             .call(Drawing.dashLine, lineDash, lineWidth);
 
+
+
         path.style({
             'cursor': 'pointer',
             'pointer-events': 'all',
@@ -226,6 +228,28 @@ function drawOne(gd, index) {
             path.style('pointer-events', 'none');
         });
 
+
+        var editHelpers;
+        if(isActiveShape || gd._context.edits.shapePosition) editHelpers = arrayEditor(gd.layout, 'shapes', options);
+
+        if(isActiveShape) {
+            path.style({
+                cursor: 'move',
+            });
+
+            var dragOptions = {
+                element: path.node(),
+                plotinfo: plotinfo,
+                gd: gd,
+                editHelpers: editHelpers,
+                hasText: options.label.text || options.label.texttemplate,
+                isActiveShape: true // i.e. to enable controllers
+            };
+
+            var polygons = readPaths(d, gd);
+            // display polygons on the screen
+            displayOutlines(polygons, path, dragOptions);
+        }
         return path;
     }
 }
