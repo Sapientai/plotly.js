@@ -119,7 +119,6 @@ function drawOne(gd, index) {
             'class': 'shape-path'
         };
 
-        console.log('Drawing shape:', index);
 
         var opacity = options.opacity;
         var fillColor = options.fillcolor;
@@ -138,9 +137,6 @@ function drawOne(gd, index) {
             options.editable && gd._fullLayout._activeShapeIndex === index;
 
         if(isActiveShape) {
-            fillColor = isOpen ? 'rgba(0,0,0,0)' :
-                gd._fullLayout.activeshape.fillcolor;
-
             opacity = gd._fullLayout.activeshape.opacity;
         }
 
@@ -155,8 +151,6 @@ function drawOne(gd, index) {
             .call(Color.fill, fillColor)
             .call(Drawing.dashLine, lineDash, lineWidth);
 
-
-
         path.style({
             'cursor': 'pointer',
             'pointer-events': 'all',
@@ -165,42 +159,50 @@ function drawOne(gd, index) {
 
         // Updated click handler with Dash-compatible structure
         path.node().addEventListener('click', function(evt) {
+            
             // First check if we're hovering over a data point
             if (gd._hoverdata) {
-                // If there's hover data, let the normal point click handling take over
                 return;
             }
 
-            console.log('Shape clicked:', index);
             evt.stopPropagation();
             evt.preventDefault();
             
-            // Structure matching Dash's expected format
-            var eventData = {
-                points: [{
-                    curveNumber: -1,  // Special number for shapes
-                    pointNumber: index,
-                    pointIndex: index,
-                    data: {
-                        shapeId: options.id || `shape-${index}`,
-                        type: 'shape'
-                    },
-                    x: options.x0,
-                    y: options.y0,
-                    customdata: {
-                        type: 'shape',
-                        index: index,
-                        shapeId: options.id || `shape-${index}`,
-                        x0: options.x0,
-                        y0: options.y0,
-                        x1: options.x1,
-                        y1: options.y1,
-                        fillcolor: options.fillcolor
-                    }
-                }]
-            };
+            // Check if this shape is already active
+            var isDeactivating = (index === gd._fullLayout._activeShapeIndex);
             
-            console.log('Emitting click event with data:', JSON.stringify(eventData, null, 2));
+            // Structure matching Dash's expected format
+            if (isDeactivating) {
+                var eventData = {
+                    points: []
+                };
+            } else {
+                var eventData = {
+                    points: [{
+                        curveNumber: -1,  // Special number for shapes
+                        pointNumber: index,
+                        pointIndex: index,
+                        data: {
+                            shapeId: options.id || `shape-${index}`,
+                            type: 'shape'
+                        },
+                        x: options.x0,
+                        y: options.y0,
+                        customdata: {
+                            type: 'shape',
+                            index: index,
+                            shapeId: options.id || `shape-${index}`,
+                            x0: options.x0,
+                            y0: options.y0,
+                            x1: options.x1,
+                            y1: options.y1,
+                            fillcolor: options.fillcolor,
+                            selected: !isDeactivating  // true when activating, false when deactivating
+                        }
+                    }]
+                };
+            }
+            
             
             if (gd && typeof gd.emit === 'function') {
                 // Clear any existing hover states
@@ -211,6 +213,15 @@ function drawOne(gd, index) {
                 
                 // Emit the click event
                 gd.emit('plotly_click', eventData);
+            }
+
+            // Handle shape activation/deactivation
+            if (isDeactivating) {
+                deactivateShape(gd);
+            } else {
+                gd._fullLayout._activeShapeIndex = index;
+                gd._fullLayout._deactivateShape = deactivateShape;
+                draw(gd);
             }
             
             return false;
@@ -259,7 +270,6 @@ function drawOne(gd, index) {
                 );
             }
         }
-        path.node().addEventListener('click', function() { return activateShape(gd, path); });
     }
 }
 
@@ -674,21 +684,8 @@ function movePath(pathIn, moveX, moveY) {
 }
 
 function activateShape(gd, path) {
-    if(!couldHaveActiveShape(gd)) return;
-
-    var element = path.node();
-    var id = +element.getAttribute('data-index');
-    if(id >= 0) {
-        // deactivate if already active
-        if(id === gd._fullLayout._activeShapeIndex) {
-            deactivateShape(gd);
-            return;
-        }
-
-        gd._fullLayout._activeShapeIndex = id;
-        gd._fullLayout._deactivateShape = deactivateShape;
-        draw(gd);
-    }
+    // This function is now deprecated as the logic has been moved to the click handler
+    return;
 }
 
 function deactivateShape(gd) {

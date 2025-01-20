@@ -35853,7 +35853,6 @@ var Plotly = (() => {
             d,
             "class": "shape-path"
           };
-          console.log("Drawing shape:", index);
           var opacity = options.opacity;
           var fillColor = options.fillcolor;
           var lineColor = options.line.width ? options.line.color : "rgba(0,0,0,0)";
@@ -35866,7 +35865,6 @@ var Plotly = (() => {
           var isOpen = d[d.length - 1] !== "Z";
           var isActiveShape = couldHaveActiveShape(gd) && options.editable && gd._fullLayout._activeShapeIndex === index;
           if (isActiveShape) {
-            fillColor = isOpen ? "rgba(0,0,0,0)" : gd._fullLayout.activeshape.fillcolor;
             opacity = gd._fullLayout.activeshape.opacity;
           }
           var shapeGroup = shapeLayer.append("g").classed("shape-group", true).attr({ "data-index": index });
@@ -35880,40 +35878,54 @@ var Plotly = (() => {
             if (gd._hoverdata) {
               return;
             }
-            console.log("Shape clicked:", index);
             evt.stopPropagation();
             evt.preventDefault();
-            var eventData = {
-              points: [{
-                curveNumber: -1,
-                // Special number for shapes
-                pointNumber: index,
-                pointIndex: index,
-                data: {
-                  shapeId: options.id || `shape-${index}`,
-                  type: "shape"
-                },
-                x: options.x0,
-                y: options.y0,
-                customdata: {
-                  type: "shape",
-                  index,
-                  shapeId: options.id || `shape-${index}`,
-                  x0: options.x0,
-                  y0: options.y0,
-                  x1: options.x1,
-                  y1: options.y1,
-                  fillcolor: options.fillcolor
-                }
-              }]
-            };
-            console.log("Emitting click event with data:", JSON.stringify(eventData, null, 2));
+            var isDeactivating = index === gd._fullLayout._activeShapeIndex;
+            if (isDeactivating) {
+              var eventData = {
+                points: []
+              };
+            } else {
+              var eventData = {
+                points: [{
+                  curveNumber: -1,
+                  // Special number for shapes
+                  pointNumber: index,
+                  pointIndex: index,
+                  data: {
+                    shapeId: options.id || `shape-${index}`,
+                    type: "shape"
+                  },
+                  x: options.x0,
+                  y: options.y0,
+                  customdata: {
+                    type: "shape",
+                    index,
+                    shapeId: options.id || `shape-${index}`,
+                    x0: options.x0,
+                    y0: options.y0,
+                    x1: options.x1,
+                    y1: options.y1,
+                    fillcolor: options.fillcolor,
+                    selected: !isDeactivating
+                    // true when activating, false when deactivating
+                  }
+                }]
+              };
+            }
             if (gd && typeof gd.emit === "function") {
               gd._hoverdata = null;
               if (gd._fullLayout) {
                 gd._fullLayout._hoversubplot = null;
               }
               gd.emit("plotly_click", eventData);
+            }
+            if (isDeactivating) {
+              deactivateShape(gd);
+            } else {
+              gd._fullLayout._activeShapeIndex = index;
+              gd._fullLayout._deactivateShape = deactivateShape;
+              draw(gd);
             }
             return false;
           });
@@ -35952,9 +35964,6 @@ var Plotly = (() => {
               );
             }
           }
-          path.node().addEventListener("click", function() {
-            return activateShape(gd, path);
-          });
         }
       }
       function setClipPath(shapePath, gd, shapeOptions) {
@@ -36275,20 +36284,6 @@ var Plotly = (() => {
           });
           return segmentType + paramString;
         });
-      }
-      function activateShape(gd, path) {
-        if (!couldHaveActiveShape(gd)) return;
-        var element = path.node();
-        var id = +element.getAttribute("data-index");
-        if (id >= 0) {
-          if (id === gd._fullLayout._activeShapeIndex) {
-            deactivateShape(gd);
-            return;
-          }
-          gd._fullLayout._activeShapeIndex = id;
-          gd._fullLayout._deactivateShape = deactivateShape;
-          draw(gd);
-        }
       }
       function deactivateShape(gd) {
         if (!couldHaveActiveShape(gd)) return;
