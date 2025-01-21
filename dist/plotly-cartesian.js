@@ -35798,6 +35798,20 @@ var Plotly = (() => {
       };
       function draw(gd) {
         var fullLayout = gd._fullLayout;
+        if (fullLayout._activeShapeIndex >= 0) {
+          var activeShapeExists = false;
+          if (fullLayout.shapes) {
+            for (var i = 0; i < fullLayout.shapes.length; i++) {
+              if (i === fullLayout._activeShapeIndex && fullLayout.shapes[i].visible === true) {
+                activeShapeExists = true;
+                break;
+              }
+            }
+          }
+          if (!activeShapeExists) {
+            deactivateShape(gd);
+          }
+        }
         fullLayout._shapeUpperLayer.selectAll("path").remove();
         fullLayout._shapeLowerLayer.selectAll("path").remove();
         fullLayout._shapeUpperLayer.selectAll("text").remove();
@@ -35819,14 +35833,25 @@ var Plotly = (() => {
         return !!gd._fullLayout._outlining;
       }
       function couldHaveActiveShape(gd) {
+        console.log("gd._context.edits.shapePosition:", !gd._context.edits.shapePosition);
         return !gd._context.edits.shapePosition;
       }
       function drawOne(gd, index) {
         gd._fullLayout._paperdiv.selectAll('.shapelayer [data-index="' + index + '"]').remove();
+        gd._fullLayout._paperdiv.selectAll('.outline-controller[data-index="' + index + '"]').remove();
         var o = helpers.makeShapesOptionsAndPlotinfo(gd, index);
         var options = o.options;
         var plotinfo = o.plotinfo;
-        if (!options._input || options.visible !== true) return;
+        if (!options._input || options.visible !== true) {
+          var shapes = gd._fullLayout.shapes || [];
+          for (var i = 0; i < shapes.length + 1; i++) {
+            if (gd._fullLayout._activeShapeIndex === i) {
+              deactivateShape(gd);
+              gd._fullLayout._paperdiv.selectAll('.outline-controller[data-index="' + i + '"]').remove();
+            }
+          }
+          return;
+        }
         if (options.layer === "above") {
           drawShape(gd._fullLayout._shapeUpperLayer);
         } else if (options.xref === "paper" || options.yref === "paper") {
@@ -36282,15 +36307,24 @@ var Plotly = (() => {
         });
       }
       function deactivateShape(gd) {
-        if (!couldHaveActiveShape(gd)) return;
+        console.log("deactivateShape called with gd:", gd);
+        console.log("Clearing outline controllers");
+        if (!couldHaveActiveShape(gd)) {
+          console.log("Early return: couldHaveActiveShape is false");
+          return;
+        }
         var id = gd._fullLayout._activeShapeIndex;
+        console.log("activeShapeIndex:", id);
         if (id >= 0) {
           clearOutlineControllers(gd);
+          console.log("Clearing outline controllers");
+          gd._fullLayout._paperdiv.selectAll(".outline-controller").remove();
           delete gd._fullLayout._activeShapeIndex;
           draw(gd);
         }
       }
       function eraseActiveShape(gd) {
+        console.log("eraseActiveShape called with gd:", gd);
         if (!couldHaveActiveShape(gd)) return;
         clearOutlineControllers(gd);
         var id = gd._fullLayout._activeShapeIndex;

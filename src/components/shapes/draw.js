@@ -43,6 +43,22 @@ module.exports = {
 function draw(gd) {
     var fullLayout = gd._fullLayout;
 
+    // Only deactivate shapes that no longer exist
+    if(fullLayout._activeShapeIndex >= 0) {
+        var activeShapeExists = false;
+        if (fullLayout.shapes) {
+            for (var i = 0; i < fullLayout.shapes.length; i++) {
+                if (i === fullLayout._activeShapeIndex && fullLayout.shapes[i].visible === true) {
+                    activeShapeExists = true;
+                    break;
+                }
+            }
+        }
+        if (!activeShapeExists) {
+            deactivateShape(gd);
+        }
+    }
+
     // Remove previous shapes before drawing new in shapes in fullLayout.shapes
     fullLayout._shapeUpperLayer.selectAll('path').remove();
     fullLayout._shapeLowerLayer.selectAll('path').remove();
@@ -84,13 +100,31 @@ function drawOne(gd, index) {
         .selectAll('.shapelayer [data-index="' + index + '"]')
         .remove();
 
+    // Add this: Clean up outline controllers for this shape
+    gd._fullLayout._paperdiv
+        .selectAll('.outline-controller[data-index="' + index + '"]')
+        .remove();
+
     var o = helpers.makeShapesOptionsAndPlotinfo(gd, index);
     var options = o.options;
     var plotinfo = o.plotinfo;
 
     // this shape is gone - quit now after deleting it
     // TODO: use d3 idioms instead of deleting and redrawing every time
-    if(!options._input || options.visible !== true) return;
+    if(!options._input || options.visible !== true) {
+        // Check all shapes when one is removed
+        var shapes = gd._fullLayout.shapes || [];
+        for (var i = 0; i < shapes.length + 1; i++) {
+            if (gd._fullLayout._activeShapeIndex === i) {
+                deactivateShape(gd);
+                // Clean up outline controllers for all indices
+                gd._fullLayout._paperdiv
+                    .selectAll('.outline-controller[data-index="' + i + '"]')
+                    .remove();
+            }
+        }
+        return;
+    }
 
     if(options.layer === 'above') {
         drawShape(gd._fullLayout._shapeUpperLayer);
@@ -689,11 +723,15 @@ function activateShape(gd, path) {
 }
 
 function deactivateShape(gd) {
-    if(!couldHaveActiveShape(gd)) return;
+
+    if(!couldHaveActiveShape(gd)) {
+        return;
+    }
 
     var id = gd._fullLayout._activeShapeIndex;
     if(id >= 0) {
         clearOutlineControllers(gd);
+        gd._fullLayout._paperdiv.selectAll('.outline-controller').remove();
         delete gd._fullLayout._activeShapeIndex;
         draw(gd);
     }
