@@ -717,22 +717,29 @@ function movePath(pathIn, moveX, moveY) {
     });
 }
 
-function activateShape(gd, path) {
-    // This function is now deprecated as the logic has been moved to the click handler
-    return;
-}
-
 function deactivateShape(gd) {
-
-    if(!couldHaveActiveShape(gd)) {
-        return;
-    }
+    if(!couldHaveActiveShape(gd)) return;
 
     var id = gd._fullLayout._activeShapeIndex;
     if(id >= 0) {
         clearOutlineControllers(gd);
         gd._fullLayout._paperdiv.selectAll('.outline-controller').remove();
         delete gd._fullLayout._activeShapeIndex;
+        
+        // Emit click event with empty points array
+        if (gd && typeof gd.emit === 'function') {
+            // Clear any existing hover states
+            gd._hoverdata = null;
+            if (gd._fullLayout) {
+                gd._fullLayout._hoversubplot = null;
+            }
+            
+            // Emit the click event with empty points
+            gd.emit('plotly_click', {
+                points: []
+            });
+        }
+        
         draw(gd);
     }
 }

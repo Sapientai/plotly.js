@@ -35833,7 +35833,6 @@ var Plotly = (() => {
         return !!gd._fullLayout._outlining;
       }
       function couldHaveActiveShape(gd) {
-        console.log("gd._context.edits.shapePosition:", !gd._context.edits.shapePosition);
         return !gd._context.edits.shapePosition;
       }
       function drawOne(gd, index) {
@@ -36307,24 +36306,25 @@ var Plotly = (() => {
         });
       }
       function deactivateShape(gd) {
-        console.log("deactivateShape called with gd:", gd);
-        console.log("Clearing outline controllers");
-        if (!couldHaveActiveShape(gd)) {
-          console.log("Early return: couldHaveActiveShape is false");
-          return;
-        }
+        if (!couldHaveActiveShape(gd)) return;
         var id = gd._fullLayout._activeShapeIndex;
-        console.log("activeShapeIndex:", id);
         if (id >= 0) {
           clearOutlineControllers(gd);
-          console.log("Clearing outline controllers");
           gd._fullLayout._paperdiv.selectAll(".outline-controller").remove();
           delete gd._fullLayout._activeShapeIndex;
+          if (gd && typeof gd.emit === "function") {
+            gd._hoverdata = null;
+            if (gd._fullLayout) {
+              gd._fullLayout._hoversubplot = null;
+            }
+            gd.emit("plotly_click", {
+              points: []
+            });
+          }
           draw(gd);
         }
       }
       function eraseActiveShape(gd) {
-        console.log("eraseActiveShape called with gd:", gd);
         if (!couldHaveActiveShape(gd)) return;
         clearOutlineControllers(gd);
         var id = gd._fullLayout._activeShapeIndex;
