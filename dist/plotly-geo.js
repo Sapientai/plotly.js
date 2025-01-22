@@ -35841,6 +35841,15 @@ var Plotly = (() => {
         var o = helpers.makeShapesOptionsAndPlotinfo(gd, index);
         var options = o.options;
         var plotinfo = o.plotinfo;
+        if (options.clear_selection === true && gd._fullLayout._activeShapeIndex === index) {
+          console.log("clearing shape", index);
+          deactivateShape(gd);
+          gd._fullLayout._paperdiv.selectAll('.outline-controller[data-index="' + index + '"]').remove();
+          options.clear_selection = false;
+          if (gd._fullLayout.shapes[index]) {
+            gd._fullLayout.shapes[index].clear_selection = false;
+          }
+        }
         if (!options._input || options.visible !== true) {
           var shapes = gd._fullLayout.shapes || [];
           for (var i = 0; i < shapes.length + 1; i++) {
@@ -53543,6 +53552,11 @@ var Plotly = (() => {
           dflt: false,
           editType: "calc+arraydraw"
         },
+        clear_selection: {
+          valType: "boolean",
+          dflt: false,
+          editType: "calc+arraydraw"
+        },
         label: {
           text: {
             valType: "string",
@@ -53645,6 +53659,7 @@ var Plotly = (() => {
         coerce("opacity");
         coerce("fillcolor");
         coerce("fillrule");
+        coerce("clear_selection");
         var lineWidth = coerce("line.width");
         if (lineWidth) {
           coerce("line.color");

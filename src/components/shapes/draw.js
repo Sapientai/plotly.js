@@ -109,6 +109,22 @@ function drawOne(gd, index) {
     var options = o.options;
     var plotinfo = o.plotinfo;
 
+    // Handle clear_selection before visibility check
+    if(options.clear_selection === true && gd._fullLayout._activeShapeIndex === index) {
+        console.log('clearing shape', index);
+        deactivateShape(gd);
+        // Clean up outline controllers for this index
+        gd._fullLayout._paperdiv
+            .selectAll('.outline-controller[data-index="' + index + '"]')
+            .remove();
+        
+        // Reset the clear_selection flag after deactivating
+        options.clear_selection = false;
+        if (gd._fullLayout.shapes[index]) {
+            gd._fullLayout.shapes[index].clear_selection = false;
+        }
+    }
+
     // this shape is gone - quit now after deleting it
     // TODO: use d3 idioms instead of deleting and redrawing every time
     if(!options._input || options.visible !== true) {

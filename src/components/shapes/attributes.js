@@ -339,6 +339,15 @@ module.exports = templatedArray('shape', {
             '`config.editable` or `config.edits.shapePosition`.'
         ].join(' ')
     },
+    clear_selection: {
+        valType: 'boolean',
+        dflt: false,
+        editType: 'calc+arraydraw',
+        description: [
+            'When set to true, deactivates this shape if it is currently selected.',
+            'The flag is automatically reset to false after deactivation.'
+        ].join(' ')
+    },
     label: {
         text: {
             valType: 'string',

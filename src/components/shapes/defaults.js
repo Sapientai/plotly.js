@@ -55,6 +55,7 @@ function handleShapeDefaults(shapeIn, shapeOut, fullLayout) {
     coerce('opacity');
     coerce('fillcolor');
     coerce('fillrule');
+    coerce('clear_selection');
     var lineWidth = coerce('line.width');
     if(lineWidth) {
         coerce('line.color');

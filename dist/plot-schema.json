@@ -9410,6 +9410,12 @@
    "shapes": {
     "items": {
      "shape": {
+      "clear_selection": {
+       "description": "When set to true, deactivates this shape if it is currently selected. The flag is automatically reset to false after deactivation.",
+       "dflt": false,
+       "editType": "calc+arraydraw",
+       "valType": "boolean"
+      },
       "editable": {
        "description": "Determines whether the shape could be activated for edit or not. Has no effect when the older editable shapes mode is enabled via `config.editable` or `config.edits.shapePosition`.",
        "dflt": false,
