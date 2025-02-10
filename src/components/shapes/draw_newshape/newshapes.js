@@ -83,11 +83,31 @@ function newShapes(outlines, dragOptions) {
             switch(beforeEdit.type) {
                 case 'line':
                 case 'rect':
-                case 'circle':
-                    modifyItem('x0', afterEdit.x0 - (beforeEdit.x0shift || 0));
-                    modifyItem('x1', afterEdit.x1 - (beforeEdit.x1shift || 0));
+                case 'circle':        
+                    var x0val = afterEdit.x0;
+                    var x1val = afterEdit.x1;
+
+                    // Handle date strings by converting to timestamps if needed
+                    if (typeof x0val === 'string' && typeof x1val === 'string') {
+                        x0val = new Date(x0val).getTime();
+                        x1val = new Date(x1val).getTime();
+                        
+                        // Convert shifts to timestamps as well if they exist
+                        var x0shift = beforeEdit.x0shift ? new Date(beforeEdit.x0shift).getTime() : 0;
+                        var x1shift = beforeEdit.x1shift ? new Date(beforeEdit.x1shift).getTime() : 0;
+                        
+                        x0val = x0val - x0shift;
+                        x1val = x1val - x1shift;
+                    } else {
+                        x0val = x0val - (beforeEdit.x0shift || 0);
+                        x1val = x1val - (beforeEdit.x1shift || 0);
+                    }
+                    
+                    modifyItem('x0', x0val);
+                    modifyItem('x1', x1val);
                     modifyItem('y0', afterEdit.y0 - (beforeEdit.y0shift || 0));
                     modifyItem('y1', afterEdit.y1 - (beforeEdit.y1shift || 0));
+                    
                     break;
 
                 case 'path':
@@ -102,7 +122,8 @@ function newShapes(outlines, dragOptions) {
         return allShapes;
     }
 
-    return editHelpers ? editHelpers.getUpdateObj() : {};
+    var updateObj = editHelpers ? editHelpers.getUpdateObj() : {};
+    return updateObj;
 }
 
 function createShapeObj(outlines, dragOptions, dragmode) {
