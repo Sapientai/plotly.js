@@ -175,7 +175,7 @@ function drawOne(gd, index) {
         var lineColor = options.line.width ? options.line.color : 'rgba(0,0,0,0)';
         var lineWidth = options.line.width;
         var lineDash = options.line.dash;
-        if(!lineWidth && options.editable === true) {
+        if(options.editable === true) {
             // ensure invisible border to activate the shape
             lineWidth = 5;
             lineDash = 'solid';
